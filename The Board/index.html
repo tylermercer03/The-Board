@@ -18,7 +18,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Ne
 #pin-keypad{display:grid;grid-template-columns:repeat(3,76px);gap:13px}
 .pk{width:76px;height:76px;border-radius:50%;border:0.5px solid var(--border2);background:var(--bg2);font-size:22px;font-weight:500;color:var(--text);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center}
 .pk:active{background:var(--bg3)}
-#app{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg)}
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg);overscroll-behavior:none}
 #top-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid var(--border);flex-shrink:0;gap:8px;background:var(--bg)}
 #app-name{font-size:15px;font-weight:600;color:var(--text);letter-spacing:-0.01em}
 #date-nav{display:flex;align-items:center;gap:7px}
@@ -45,7 +45,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Ne
 #tl-right{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .gcal-bar{padding:6px 12px;font-size:11px;color:var(--text3);border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--bg)}
 .gcal-bar button{font-size:11px;padding:3px 9px;cursor:pointer;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);touch-action:manipulation}
-#blocks-scroll{flex:1;overflow-y:scroll;overflow-x:hidden;position:relative;-webkit-overflow-scrolling:touch}
+#blocks-scroll{flex:1;overflow-y:scroll;overflow-x:hidden;position:relative;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 #blocks-inner{position:relative}
 .hline{position:absolute;left:0;right:0;border-top:0.5px solid var(--border);pointer-events:none}
 .sblock{position:absolute;left:7px;right:7px;border-radius:5px}
@@ -541,7 +541,12 @@ let blockTasks={}; // {dateKey: {blockId: [{id,text,cat,done}]}}
 let tapAssignMode=false,tapAssignTask=null;
 
 function uid(){return Math.random().toString(36).slice(2,9)}
-function dk(d){return d.toISOString().split('T')[0]}
+function dk(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 function fd(d){return d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}
 function isToday(d){return d.toDateString()===new Date().toDateString()}
 function isWeekend(d){const dow=d.getDay();return dow===0||dow===6}
@@ -779,7 +784,20 @@ function drawNow(c){
 function syncScroll(){
   const scroll=document.getElementById('blocks-scroll');
   const gutter=document.getElementById('gutter');
-  scroll.addEventListener('scroll',()=>{gutter.scrollTop=scroll.scrollTop;},{ passive:true });
+  scroll.addEventListener('scroll',()=>{gutter.scrollTop=scroll.scrollTop;},{passive:true});
+
+  // Capture all wheel events on the app and redirect to timeline scroll
+  document.getElementById('app').addEventListener('wheel',function(e){
+    // Allow scrolling inside modals, task sidebar, and chat
+    if(e.target.closest('.modal')||e.target.closest('#task-sidebar')||e.target.closest('#chat-ov')||e.target.closest('#chat-msgs')){return;}
+    // Everything else scrolls the timeline
+    e.preventDefault();
+    scroll.scrollTop+=e.deltaY;
+  },{passive:false});
+
+  // Prevent body scroll entirely
+  document.body.style.overflow='hidden';
+  document.documentElement.style.overflow='hidden';
 }
 
 function scrollNow(){
