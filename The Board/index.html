@@ -812,7 +812,6 @@ function updateDate(){
   document.getElementById('current-date').textContent=fd(curDate);
   isMonday=curDate.getDay()===1;
   buildGutter();buildTL();updateStrip();setTimeout(scrollNow,150);
-  if(gcalConnected)loadGcalEvents();
 }
 
 // Tasks sidebar
@@ -930,8 +929,8 @@ document.addEventListener('DOMContentLoaded',function(){
   promoteFutureTasks();
 
   // Date nav
-  document.getElementById('btn-prev').onclick=()=>{curDate.setDate(curDate.getDate()-1);updateDate();};
-  document.getElementById('btn-next').onclick=()=>{curDate.setDate(curDate.getDate()+1);updateDate();};
+  document.getElementById('btn-prev').onclick=()=>{curDate.setDate(curDate.getDate()-1);updateDate();if(gcalConnected)setTimeout(loadGcalEvents,100);};
+  document.getElementById('btn-next').onclick=()=>{curDate.setDate(curDate.getDate()+1);updateDate();if(gcalConnected)setTimeout(loadGcalEvents,100);};
   document.getElementById('btn-today').onclick=()=>{curDate=new Date();updateDate();};
 
   // Clear day
@@ -1080,6 +1079,7 @@ document.addEventListener('DOMContentLoaded',function(){
   updateDate();
   renderTasks();
   initSB();
+  if(gcalConnected)setTimeout(loadGcalEvents,500);
 });
 
 async function loadGcalEvents(){
