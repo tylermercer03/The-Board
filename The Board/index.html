@@ -535,7 +535,7 @@ let S={
   pin:'',
 };
 
-let curDate=new Date(),dayData={},evts={},isMonday=false,chatHist=[],sb=null;
+let curDate=new Date(),dayData={},evts={},isMonday=false,chatHist=[],sb=null,gcalConnected=false;
 let tasks=[]; // [{id,text,cat,timing,futureDate,done}]
 let blockTasks={}; // {dateKey: {blockId: [{id,text,cat,done}]}}
 let tapAssignMode=false,tapAssignTask=null;
@@ -791,6 +791,7 @@ function updateDate(){
   document.getElementById('current-date').textContent=fd(curDate);
   isMonday=curDate.getDay()===1;
   buildGutter();buildTL();updateStrip();setTimeout(scrollNow,150);
+  if(gcalConnected)loadGcalEvents();
 }
 
 // Tasks sidebar
@@ -898,6 +899,13 @@ async function sendChat(msg){
 
 document.addEventListener('DOMContentLoaded',function(){
   loadLS();loadDataLS();initPin();
+  // Restore gcal connected state
+  if(localStorage.getItem('pos_gcal')==='1'){
+    gcalConnected=true;
+    localStorage.setItem('pos_gcal','1');
+    document.getElementById('gcal-msg').textContent='Connected ✓';
+    document.getElementById('btn-gcal').style.display='none';
+  }
   promoteFutureTasks();
 
   // Date nav
@@ -986,6 +994,7 @@ document.addEventListener('DOMContentLoaded',function(){
   // Check Google Calendar OAuth return
   const urlP=new URLSearchParams(window.location.search);
   const gcalStatus=urlP.get('gcal');
+  if(gcalStatus){window.history.replaceState({},'',window.location.pathname);}
   if(gcalStatus==='connected'){
     document.getElementById('gcal-msg').textContent='Connected \u2713';
     document.getElementById('btn-gcal').style.display='none';
