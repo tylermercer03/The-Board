@@ -809,8 +809,11 @@ function buildTL(){
       const leftPct=colIdx*pct;
       ed.style.top=hY(sH)+'px';
       ed.style.height=Math.max((eH-sH)*PPH-4,22)+'px';
-      ed.style.left='calc('+leftPct+'% + 7px)';
-      ed.style.right='calc('+(100-(leftPct+pct))+'% + 7px)';
+      // Position cal events on right side to avoid covering block content
+      const calLeft=totalCols>1?'calc('+(55+leftPct*(45/100))+'% + 4px)':'55%';
+      const calRight=totalCols>1?'calc('+(100-((leftPct+pct)*(45/100)+55))+'% + 4px)':'7px';
+      ed.style.left=calLeft;
+      ed.style.right=calRight;
       ed.style.width='auto';
       ed.style.borderLeftColor=evColor;
       ed.style.background=evColor+'22';
