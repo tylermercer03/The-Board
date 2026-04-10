@@ -52,7 +52,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Ne
 #blocks-scroll{flex:1;overflow-y:scroll;overflow-x:hidden;position:relative;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 #blocks-inner{position:relative}
 .hline{position:absolute;left:0;right:0;border-top:0.5px solid var(--border);pointer-events:none}
-.sblock{position:absolute;left:7px;right:7px;border-radius:5px}
+.sblock{position:absolute;left:7px;right:50%;border-radius:5px}
 .sblock.drag-over{outline:2px solid #378add;outline-offset:-2px}
 .sbhdr{padding:5px 9px 3px;display:flex;align-items:baseline;justify-content:space-between;gap:4px;border-radius:5px 5px 0 0}
 .sbtitle{font-size:13px;font-weight:500;line-height:1.3}
@@ -809,11 +809,13 @@ function buildTL(){
       const leftPct=colIdx*pct;
       ed.style.top=hY(sH)+'px';
       ed.style.height=Math.max((eH-sH)*PPH-4,22)+'px';
-      // Position cal events on right side to avoid covering block content
-      const calLeft=totalCols>1?'calc('+(55+leftPct*(45/100))+'% + 4px)':'55%';
-      const calRight=totalCols>1?'calc('+(100-((leftPct+pct)*(45/100)+55))+'% + 4px)':'7px';
-      ed.style.left=calLeft;
-      ed.style.right=calRight;
+      // Cal events occupy right 50%, split into columns if overlapping
+      const halfW=50; // percent
+      const colW=halfW/totalCols;
+      const colLeft=50+colIdx*colW;
+      const colRight=100-((colIdx+1)*colW+50);  // always >=0
+      ed.style.left='calc('+colLeft+'% + 4px)';
+      ed.style.right='calc('+Math.max(colRight,0)+'% + 7px)';
       ed.style.width='auto';
       ed.style.borderLeftColor=evColor;
       ed.style.background=evColor+'22';
