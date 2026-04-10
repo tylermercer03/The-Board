@@ -80,7 +80,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Ne
 .mbadge{font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,.3);margin-left:4px;vertical-align:middle}
 .nowline{position:absolute;left:0;right:0;height:2px;background:#e24b4a;pointer-events:none;z-index:10}
 .nowdot{position:absolute;left:-4px;top:-4px;width:9px;height:9px;border-radius:50%;background:#e24b4a}
-.calevent{position:absolute;left:7px;right:7px;border-radius:4px;padding:4px 8px;border-left:3px solid #378add;background:#e6f1fb;z-index:5;overflow:hidden}
+.calevent{position:absolute;left:7px;right:7px;border-radius:4px;padding:4px 8px;border-left:3px solid #378add;background:#e6f1fb;z-index:20;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.15)}
 .calevent-title{font-size:12px;font-weight:500;color:#0c447c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .calevent-time{font-size:11px;color:#185fa5}
 .calevent.pending{border-left-color:#888;background:var(--bg2)}
@@ -1063,12 +1063,26 @@ document.addEventListener('DOMContentLoaded',function(){
 
 async function loadGcalEvents(){
   const today=dk(curDate);
-  const timeMin=today+'T00:00:00-07:00';
-  const timeMax=today+'T23:59:59-07:00';
+  // Use proper timezone offset for LA (PDT=-7, PST=-8)
+  const offset=new Date().getTimezoneOffset();
+  const sign=offset>0?'-':'+';
+  const absOff=Math.abs(offset);
+  const tzStr=sign+String(Math.floor(absOff/60)).padStart(2,'0')+':'+String(absOff%60).padStart(2,'0');
+  const timeMin=today+'T00:00:00'+tzStr;
+  const timeMax=today+'T23:59:59'+tzStr;
   try{
     const res=await fetch('/.netlify/functions/gcal-events?timeMin='+encodeURIComponent(timeMin)+'&timeMax='+encodeURIComponent(timeMax));
-    const{events}=await res.json();
-    if(events){evts[today]=events;buildTL();}
+    if(!res.ok){console.log('GCal error status:',res.status);return;}
+    const json=await res.json();
+    if(json.error){console.log('GCal error:',json.error);
+      if(json.error==='not_connected'){gcalConnected=false;localStorage.removeItem('pos_gcal');document.getElementById('btn-gcal').style.display='';document.getElementById('gcal-msg').textContent='';}
+      return;
+    }
+    if(json.events){
+      console.log('GCal events loaded:',json.events.length,'for',today);
+      evts[today]=json.events;
+      buildTL();
+    }
   }catch(e){console.log('GCal fetch error',e);}
 }
 </script>
