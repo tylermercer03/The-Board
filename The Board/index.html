@@ -757,7 +757,10 @@ function buildTL(){
     const sH=hFT(ev.start_time||'09:00'),eH=hFT(ev.end_time||'10:00');
     const ed=document.createElement('div');ed.className='calevent'+(ev.gcal_id?'':' pending');
     ed.style.top=hY(sH)+'px';ed.style.height=Math.max((eH-sH)*PPH-4,22)+'px';
-    ed.innerHTML='<div class="calevent-title">'+ev.title+'</div><div class="calevent-time">'+fTS(sH)+' \u2013 '+fTS(eH)+(ev.gcal_id?'':' \xb7 pending')+'</div>';
+    const evColor=ev.color||'#378add';
+    ed.style.borderLeftColor=evColor;
+    ed.style.background=evColor+'22';
+    ed.innerHTML='<div class="calevent-title" style="color:'+evColor+'">'+ev.title+(ev.calendar?' <span style="opacity:.6;font-size:10px;">'+ev.calendar+'</span>':'')+'</div><div class="calevent-time" style="color:'+evColor+'">'+fTS(sH)+' \u2013 '+fTS(eH)+(ev.gcal_id?'':' \xb7 pending')+'</div>';
     inner.appendChild(ed);
   });
   drawNow(inner);
