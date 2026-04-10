@@ -1,0 +1,8 @@
+{
+  "name": "the-board",
+  "version": "1.0.0",
+  "description": "The Board - Personal Operating System",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}
