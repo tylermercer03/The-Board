@@ -43,6 +43,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Ne
 #gutter-inner{position:absolute;top:0;left:0;right:0;pointer-events:none}
 .tlbl{position:absolute;right:7px;font-size:11px;color:var(--text3);transform:translateY(-50%);white-space:nowrap}
 #tl-right{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#allday-bar{flex-shrink:0;border-bottom:0.5px solid var(--border);background:var(--bg2);padding:4px 8px 4px 0;display:none;min-height:28px}
+#allday-bar.has-events{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.allday-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:0 8px;flex-shrink:0;white-space:nowrap}
+.allday-chip{font-size:11px;padding:3px 9px;border-radius:10px;white-space:nowrap;font-weight:500}
 .gcal-bar{padding:6px 12px;font-size:11px;color:var(--text3);border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--bg)}
 .gcal-bar button{font-size:11px;padding:3px 9px;cursor:pointer;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);touch-action:manipulation}
 #blocks-scroll{flex:1;overflow-y:scroll;overflow-x:hidden;position:relative;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
@@ -80,7 +84,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Ne
 .mbadge{font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,.3);margin-left:4px;vertical-align:middle}
 .nowline{position:absolute;left:0;right:0;height:2px;background:#e24b4a;pointer-events:none;z-index:10}
 .nowdot{position:absolute;left:-4px;top:-4px;width:9px;height:9px;border-radius:50%;background:#e24b4a}
-.calevent{position:absolute;left:7px;right:7px;border-radius:4px;padding:4px 8px;border-left:3px solid #378add;background:#e6f1fb;z-index:20;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.15)}
+.calevent{position:absolute;border-radius:4px;padding:4px 8px;border-left:3px solid #378add;background:#e6f1fb;z-index:20;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.12)}
 .calevent-title{font-size:12px;font-weight:500;color:#0c447c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .calevent-time{font-size:11px;color:#185fa5}
 .calevent.pending{border-left-color:#888;background:var(--bg2)}
@@ -283,7 +287,8 @@ function pinPress(d){
       <div id="tl-inner">
         <div id="gutter"><div id="gutter-inner"></div></div>
         <div id="tl-right">
-          <div id="blocks-scroll"><div id="blocks-inner"></div></div>
+          <div id="allday-bar"><span class="allday-label">All day</span></div>
+        <div id="blocks-scroll"><div id="blocks-inner"></div></div>
         </div>
       </div>
     </div>
@@ -757,16 +762,61 @@ function buildTL(){
     div.appendChild(body);inner.appendChild(div);
   });
 
-  // Cal events
-  (evts[dk(curDate)]||[]).forEach(ev=>{
+  // Cal events - separate all-day from timed
+  const todayEvts=evts[dk(curDate)]||[];
+  const allDayEvts=todayEvts.filter(ev=>ev.all_day);
+  const timedEvts=todayEvts.filter(ev=>!ev.all_day);
+
+  // Render all-day bar
+  const alldayBar=document.getElementById('allday-bar');
+  if(allDayEvts.length){
+    alldayBar.classList.add('has-events');
+    // Remove existing chips but keep label
+    Array.from(alldayBar.querySelectorAll('.allday-chip')).forEach(c=>c.remove());
+    allDayEvts.forEach(ev=>{
+      const chip=document.createElement('span');chip.className='allday-chip';
+      const c=ev.color||'#378add';
+      chip.style.background=c+'22';chip.style.color=c;chip.style.border='1px solid '+c+'44';
+      chip.textContent=ev.title;alldayBar.appendChild(chip);
+    });
+  }else{
+    alldayBar.classList.remove('has-events');
+    Array.from(alldayBar.querySelectorAll('.allday-chip')).forEach(c=>c.remove());
+  }
+
+  // Render timed events with collision detection
+  // Group overlapping events into columns
+  const sorted=timedEvts.slice().sort((a,b)=>a.start_time.localeCompare(b.start_time));
+  const columns=[];
+  sorted.forEach(ev=>{
     const sH=hFT(ev.start_time||'09:00'),eH=hFT(ev.end_time||'10:00');
-    const ed=document.createElement('div');ed.className='calevent'+(ev.gcal_id?'':' pending');
-    ed.style.top=hY(sH)+'px';ed.style.height=Math.max((eH-sH)*PPH-4,22)+'px';
-    const evColor=ev.color||'#378add';
-    ed.style.borderLeftColor=evColor;
-    ed.style.background=evColor+'22';
-    ed.innerHTML='<div class="calevent-title" style="color:'+evColor+'">'+ev.title+(ev.calendar?' <span style="opacity:.6;font-size:10px;">'+ev.calendar+'</span>':'')+'</div><div class="calevent-time" style="color:'+evColor+'">'+fTS(sH)+' \u2013 '+fTS(eH)+(ev.gcal_id?'':' \xb7 pending')+'</div>';
-    inner.appendChild(ed);
+    let placed=false;
+    for(let col=0;col<columns.length;col++){
+      const last=columns[col][columns[col].length-1];
+      const lastEnd=hFT(last.end_time||'10:00');
+      if(sH>=lastEnd){columns[col].push(ev);placed=true;break;}
+    }
+    if(!placed)columns.push([ev]);
+  });
+  const totalCols=columns.length;
+  columns.forEach((col,colIdx)=>{
+    col.forEach(ev=>{
+      const sH=hFT(ev.start_time||'09:00'),eH=hFT(ev.end_time||'10:00');
+      const ed=document.createElement('div');ed.className='calevent'+(ev.gcal_id?'':' pending');
+      const evColor=ev.color||'#378add';
+      // Position: divide width among columns, offset by column index
+      const pct=100/totalCols;
+      const leftPct=colIdx*pct;
+      ed.style.top=hY(sH)+'px';
+      ed.style.height=Math.max((eH-sH)*PPH-4,22)+'px';
+      ed.style.left='calc('+leftPct+'% + 7px)';
+      ed.style.right='calc('+(100-(leftPct+pct))+'% + 7px)';
+      ed.style.width='auto';
+      ed.style.borderLeftColor=evColor;
+      ed.style.background=evColor+'22';
+      ed.innerHTML='<div class="calevent-title" style="color:'+evColor+'">'+ev.title+(ev.calendar&&totalCols===1?' <span style="opacity:.6;font-size:10px;">'+ev.calendar+'</span>':'')+'</div>'+(totalCols===1?'<div class="calevent-time" style="color:'+evColor+'">'+fTS(sH)+' \u2013 '+fTS(eH)+(ev.gcal_id?'':' \xb7 pending')+'</div>':'');
+      inner.appendChild(ed);
+    });
   });
   drawNow(inner);
 }
