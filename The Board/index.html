@@ -221,46 +221,56 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Ne
 .pill-del{font-size:11px;padding:3px 7px;cursor:pointer;border-radius:var(--r);color:var(--bad-text);border:0.5px solid var(--bad-border);background:var(--bad-bg);touch-action:manipulation;flex-shrink:0}
 #assign-hint{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#111;color:#fff;font-size:14px;padding:10px 20px;border-radius:24px;z-index:800;display:none;pointer-events:none}
 #assign-hint.show{display:block}
+
+/* Login screen */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:9998;display:flex;align-items:center;justify-content:center}
+#login-box{width:340px;max-width:92vw;padding:36px 32px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);box-shadow:0 4px 32px rgba(0,0,0,.12)}
+#login-box h1{font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:-0.02em}
+#login-box .login-sub{font-size:14px;color:var(--text2);margin-bottom:28px}
+.login-field{margin-bottom:14px}
+.login-field label{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px}
+.login-field input{width:100%;font-size:15px;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);font-family:inherit}
+.login-field input:focus{outline:none;border-color:#378add}
+#login-btn{width:100%;font-size:15px;font-weight:600;padding:12px;border-radius:var(--r);background:#111;color:#fff;border:none;cursor:pointer;margin-top:8px;touch-action:manipulation}
+@media(prefers-color-scheme:dark){#login-btn{background:#fff;color:#111}}
+#login-btn:active{opacity:.8}
+#login-error{font-size:13px;color:var(--bad-text);margin-top:10px;min-height:18px;text-align:center}
+#login-toggle{font-size:13px;color:var(--text2);text-align:center;margin-top:16px;cursor:pointer}
+#login-toggle span{color:var(--info-text);font-weight:500}
+#logout-btn{font-size:12px;padding:5px 10px;cursor:pointer;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);touch-action:manipulation}
+
+/* Drag/resize block styles */
+.sblock{cursor:grab}
+.sblock.dragging-block{opacity:.85;cursor:grabbing;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.sblock.drag-preview{outline:2px dashed rgba(0,0,0,.3);outline-offset:-2px}
+.resize-handle{position:absolute;left:0;right:0;height:10px;cursor:ns-resize;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.resize-handle:hover,.sblock:hover .resize-handle{opacity:1}
+.resize-handle-top{top:0;border-radius:6px 6px 0 0}
+.resize-handle-bottom{bottom:0;border-radius:0 0 6px 6px}
+.resize-handle::after{content:'';width:24px;height:3px;border-radius:2px;background:rgba(0,0,0,.25)}
+.snap-indicator{position:absolute;left:0;right:50%;height:2px;background:#378add;pointer-events:none;z-index:50;display:none}
+.snap-indicator.show{display:block}
 </style>
 <script>
-var _pinEntry='';
-function _pinDots(){for(var i=0;i<4;i++){var d=document.getElementById('pd'+i);if(d)d.className='pin-dot'+(i<_pinEntry.length?' filled':'');}}
-function pinDel(){if(_pinEntry.length>0){_pinEntry=_pinEntry.slice(0,-1);_pinDots();}}
-function pinPress(d){
-  if(_pinEntry.length>=4)return;
-  _pinEntry+=d;_pinDots();
-  if(_pinEntry.length===4){
-    var s=localStorage.getItem('pos_s'),savedPin='';
-    if(s){try{savedPin=JSON.parse(s).pin||'';}catch(e){}}
-    if(!savedPin||_pinEntry===savedPin){
-      document.getElementById('pin-screen').style.display='none';
-      sessionStorage.setItem('pos_pu','1');
-    }else{
-      var err=document.getElementById('pin-error');
-      if(err)err.textContent='Incorrect PIN';
-      _pinEntry='';_pinDots();
-      setTimeout(function(){var e=document.getElementById('pin-error');if(e)e.textContent='';},1500);
-    }
-  }
-}
+// Auth token stored in sessionStorage - persists tab session, not across close
+function getAuthToken(){return sessionStorage.getItem('tb_token');}
+function setAuthToken(t){if(t)sessionStorage.setItem('tb_token',t);else sessionStorage.removeItem('tb_token');}
+function getUserId(){return sessionStorage.getItem('tb_uid');}
+function setUserId(id){if(id)sessionStorage.setItem('tb_uid',id);else sessionStorage.removeItem('tb_uid');}
+function isLoggedIn(){return !!getAuthToken();}
 </script>
 </head>
 <body>
 
-<div id="pin-screen">
-  <h2>The Board</h2>
-  <div id="pin-dots">
-    <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
-    <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
-  </div>
-  <div id="pin-error"></div>
-  <div id="pin-keypad">
-    <button class="pk" onclick="pinPress('1')">1</button><button class="pk" onclick="pinPress('2')">2</button><button class="pk" onclick="pinPress('3')">3</button>
-    <button class="pk" onclick="pinPress('4')">4</button><button class="pk" onclick="pinPress('5')">5</button><button class="pk" onclick="pinPress('6')">6</button>
-    <button class="pk" onclick="pinPress('7')">7</button><button class="pk" onclick="pinPress('8')">8</button><button class="pk" onclick="pinPress('9')">9</button>
-    <button class="pk" style="visibility:hidden;pointer-events:none"></button>
-    <button class="pk" onclick="pinPress('0')">0</button>
-    <button class="pk" onclick="pinDel()">&#9003;</button>
+<div id="login-screen">
+  <div id="login-box">
+    <h1>The Board</h1>
+    <p class="login-sub">Your personal operating system.</p>
+    <div class="login-field"><label>Email</label><input id="login-email" type="email" placeholder="you@email.com" autocomplete="email"/></div>
+    <div class="login-field"><label>Password</label><input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+    <button id="login-btn" type="button">Sign in</button>
+    <div id="login-error"></div>
+    <div id="login-toggle">No account? <span id="login-toggle-link">Create one</span></div>
   </div>
 </div>
 
@@ -273,7 +283,7 @@ function pinPress(d){
       <button id="btn-next" type="button">&#8250;</button>
     </div>
     <button id="btn-today" type="button">Today</button>
-    <div id="top-actions">
+    <div id="top-actions"><button id="logout-btn" type="button">Sign out</button>
       <button class="tbtn" id="btn-reflect" type="button">Reflections</button>
       <button class="tbtn" id="btn-settings" type="button">Settings</button>
     </div>
@@ -298,7 +308,7 @@ function pinPress(d){
       </div>
       <div id="tl-inner">
         <div id="allday-bar"><span class="allday-label">All day</span></div>
-        <div id="scroll-wrap">
+        <div id="scroll-wrap"><div id="snap-indicator" class="snap-indicator"></div>
           <div id="gutter"><div id="gutter-inner"></div></div>
           <div id="blocks-scroll"><div id="blocks-inner"></div></div>
         </div>
@@ -563,7 +573,6 @@ let S={
   defs:{0:'',1:'Strategic Thinking',2:'',3:'',4:'',5:'',6:'Replenishment'},
   profile:{projects:'Active pilot in development, waiting for network notes. Evaluating manager candidates.',pressures:'Financial holding pattern until script delivery ~June. Manager decision pending.',other:''},
   supabase:{url:'',key:''},
-  pin:'',
 };
 
 let curDate=new Date(),dayData={},evts={},isMonday=false,chatHist=[],sb=null;
@@ -681,18 +690,16 @@ function promoteFutureTasks(){
   if(changed)saveDataLS();
 }
 
-function initPin(){
-  if(localStorage.getItem('pos_gcal')==='1'){document.getElementById('gcal-msg').textContent='Connected \u2713';document.getElementById('btn-gcal').style.display='none';}
-  var unlocked=sessionStorage.getItem('pos_pu')==='1';
-  if(!S.pin||unlocked){document.getElementById('pin-screen').style.display='none';}
-}
 
 async function initSB(){
   if(!S.supabase.url||!S.supabase.key)return;
   try{
     const{createClient}=await import('https://esm.sh/@supabase/supabase-js@2');
-    sb=createClient(S.supabase.url,S.supabase.key);
-    const{data:e}=await sb.from('daily_entries').select('*').gte('entry_date',new Date(Date.now()-7*86400000).toISOString().split('T')[0]);
+    sb=createClient(S.supabase.url,S.supabase.key,{
+      global:{headers:{Authorization:'Bearer '+getAuthToken()}}
+    });
+    const uid=getUserId();
+    const{data:e}=await sb.from('daily_entries').select('*').eq('user_id',uid).gte('entry_date',new Date(Date.now()-7*86400000).toISOString().split('T')[0]);
     if(e)e.forEach(r=>{
       dayData[r.entry_date]={feel:r.feel,action:r.action,morningCats:r.morning_cats||[],afternoonCats:r.afternoon_cats||[],eodCats:r.eod_cats||[]};
       if(r.block_tasks)blockTasks[r.entry_date]=r.block_tasks;
@@ -700,10 +707,11 @@ async function initSB(){
     });
     const{data:ev}=await sb.from('cal_events').select('*').gte('event_date',new Date(Date.now()-86400000).toISOString().split('T')[0]);
     if(ev)ev.forEach(r=>{evts[r.event_date]=evts[r.event_date]||[];evts[r.event_date].push(r);});
-    const{data:sd}=await sb.from('user_settings').select('*');
+    const uid2=getUserId();
+    const{data:sd}=await sb.from('user_settings').select('*').in('key',['app_settings_'+uid2,'tasks_'+uid2]);
     if(sd)sd.forEach(r=>{
-      if(r.key==='app_settings'&&r.value)Object.assign(S,r.value);
-      if(r.key==='tasks'&&r.value)tasks=r.value;
+      if(r.key==='app_settings_'+uid2&&r.value)Object.assign(S,r.value);
+      if(r.key==='tasks_'+uid2&&r.value)tasks=r.value;
     });
     const{data:cd}=await sb.from('chat_history').select('*').eq('session_date',dk(new Date())).order('created_at');
     if(cd&&cd.length){chatHist=cd.map(r=>({role:r.role,content:r.content}));const m=document.getElementById('chat-msgs');m.innerHTML='';chatHist.forEach(r=>{const v=document.createElement('div');v.className='cmsg '+(r.role==='user'?'user':'assistant');v.textContent=r.content;m.appendChild(v);});}
@@ -714,12 +722,13 @@ async function initSB(){
 async function sbSaveEntry(k){
   if(!sb)return;
   const d=dayData[k]||{};
-  try{await sb.from('daily_entries').upsert({entry_date:k,feel:d.feel||null,action:d.action||null,morning_cats:d.morningCats||[],afternoon_cats:d.afternoonCats||[],eod_cats:d.eodCats||[],block_tasks:blockTasks[k]||{},day_block_overrides:dayBlockOverrides[k]||{}},{onConflict:'entry_date'});}catch(e){}
+  const uid=getUserId();
+  try{await sb.from('daily_entries').upsert({entry_date:k,user_id:uid,feel:d.feel||null,action:d.action||null,morning_cats:d.morningCats||[],afternoon_cats:d.afternoonCats||[],eod_cats:d.eodCats||[],block_tasks:blockTasks[k]||{},day_block_overrides:dayBlockOverrides[k]||{}},{onConflict:'entry_date,user_id'});}catch(e){}
 }
 async function sbSaveEv(ev){if(!sb)return;try{await sb.from('cal_events').insert(ev);}catch(e){}}
 async function sbSaveChat(r,c){if(!sb)return;try{await sb.from('chat_history').insert({session_date:dk(new Date()),role:r,content:c});}catch(e){}}
-async function sbSaveS(){if(!sb)return;try{await sb.from('user_settings').upsert({key:'app_settings',value:S,updated_at:new Date().toISOString()},{onConflict:'key'});}catch(e){}}
-async function sbSaveTasks(){if(!sb)return;try{await sb.from('user_settings').upsert({key:'tasks',value:tasks,updated_at:new Date().toISOString()},{onConflict:'key'});}catch(e){}}
+async function sbSaveS(){if(!sb)return;const uid=getUserId();try{await sb.from('user_settings').upsert({key:'app_settings_'+uid,value:S,updated_at:new Date().toISOString()},{onConflict:'key'});}catch(e){}}
+async function sbSaveTasks(){if(!sb)return;const uid=getUserId();try{await sb.from('user_settings').upsert({key:'tasks_'+uid,value:tasks,updated_at:new Date().toISOString()},{onConflict:'key'});}catch(e){}}
 
 function getCurNext(){
   if(!isToday(curDate))return{cur:null,nxt:null};
@@ -827,6 +836,170 @@ function buildWorkPills(container,blockId,suggKey){
   container.appendChild(wrap);
 }
 
+
+// ── AUTH ──────────────────────────────────────────────────────────────────
+async function doLogin(email, password, isSignup){
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.textContent = '';
+  btn.textContent = isSignup ? 'Creating account...' : 'Signing in...';
+  btn.disabled = true;
+  try {
+    const endpoint = isSignup ? '/.netlify/functions/auth-signup' : '/.netlify/functions/auth-login';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password}),
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    if(isSignup){
+      errEl.style.color = 'var(--ok-text)';
+      errEl.textContent = 'Account created! Signing you in...';
+      await doLogin(email, password, false);
+      return;
+    }
+    setAuthToken(data.session.access_token);
+    setUserId(data.user.id);
+    document.getElementById('login-screen').style.display = 'none';
+    await initSB();
+    updateDate();renderTasks();
+  } catch(e) {
+    errEl.style.color = 'var(--bad-text)';
+    errEl.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = isSignup ? 'Create account' : 'Sign in';
+  }
+}
+
+function doLogout(){
+  setAuthToken(null);setUserId(null);
+  sb = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+// ── DRAG & RESIZE BLOCKS ──────────────────────────────────────────────────
+const SNAP = 15; // minutes
+function snapH(h){ return Math.round(h * 4) / 4; } // snap to 0.25h = 15min
+
+let _drag = null; // {type:'move'|'resize-top'|'resize-bottom', blockId, startY, origStartH, origEndH}
+
+function initBlockDrag(div, b){
+  const scrollWrap = document.getElementById('scroll-wrap');
+
+  // Top resize handle
+  const topHandle = div.querySelector('.resize-handle-top');
+  // Bottom resize handle  
+  const bottomHandle = div.querySelector('.resize-handle-bottom');
+
+  function getScrollY(e){
+    const rect = scrollWrap.getBoundingClientRect();
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return clientY - rect.top + scrollWrap.scrollTop;
+  }
+
+  function startDrag(e, type){
+    e.stopPropagation();
+    e.preventDefault();
+    const scrollY = getScrollY(e);
+    _drag = {
+      type, blockId: b.id,
+      startY: scrollY,
+      origStartH: b.startH,
+      origEndH: b.endH,
+    };
+    div.classList.add('dragging-block');
+    document.body.style.userSelect = 'none';
+  }
+
+  // Move (drag the whole block from header)
+  const header = div.querySelector('.sb-top');
+  if(header){
+    header.addEventListener('mousedown', e=>startDrag(e,'move'));
+    header.addEventListener('touchstart', e=>startDrag(e,'move'), {passive:false});
+  }
+
+  // Resize handles
+  if(topHandle){
+    topHandle.addEventListener('mousedown', e=>startDrag(e,'resize-top'));
+    topHandle.addEventListener('touchstart', e=>startDrag(e,'resize-top'), {passive:false});
+  }
+  if(bottomHandle){
+    bottomHandle.addEventListener('mousedown', e=>startDrag(e,'resize-bottom'));
+    bottomHandle.addEventListener('touchstart', e=>startDrag(e,'resize-bottom'), {passive:false});
+  }
+}
+
+function applyBlockDrag(e){
+  if(!_drag) return;
+  const scrollWrap = document.getElementById('scroll-wrap');
+  const rect = scrollWrap.getBoundingClientRect();
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const scrollY = clientY - rect.top + scrollWrap.scrollTop;
+  const deltaY = scrollY - _drag.startY;
+  const deltaH = deltaY / PPH;
+
+  let newStartH = _drag.origStartH;
+  let newEndH = _drag.origEndH;
+  const minDuration = 0.25; // 15 min minimum block
+
+  if(_drag.type === 'move'){
+    const duration = _drag.origEndH - _drag.origStartH;
+    newStartH = snapH(Math.max(0, Math.min(23.75 - duration, _drag.origStartH + deltaH)));
+    newEndH = newStartH + duration;
+  } else if(_drag.type === 'resize-top'){
+    newStartH = snapH(Math.max(0, Math.min(_drag.origEndH - minDuration, _drag.origStartH + deltaH)));
+    newEndH = _drag.origEndH;
+  } else if(_drag.type === 'resize-bottom'){
+    newStartH = _drag.origStartH;
+    newEndH = snapH(Math.max(_drag.origStartH + minDuration, Math.min(24, _drag.origEndH + deltaH)));
+  }
+
+  // Update the override for this day
+  const k = dk(curDate);
+  if(!dayBlockOverrides[k]) dayBlockOverrides[k] = {};
+  if(!dayBlockOverrides[k][_drag.blockId]) dayBlockOverrides[k][_drag.blockId] = {enabled:true};
+  dayBlockOverrides[k][_drag.blockId].startH = newStartH;
+  dayBlockOverrides[k][_drag.blockId].endH = newEndH;
+
+  // Live update the div position without full rebuild
+  const div = document.querySelector('.sblock[data-block-id="'+_drag.blockId+'"]');
+  if(div){
+    div.style.top = hY(newStartH) + 'px';
+    div.style.minHeight = (newEndH - newStartH) * PPH - 2 + 'px';
+    const timeEl = div.querySelector('.sbtime');
+    if(timeEl) timeEl.textContent = '(' + fTS(newStartH) + ' – ' + fTS(newEndH) + ')';
+  }
+
+  // Snap indicator
+  const snap = document.getElementById('snap-indicator');
+  if(snap){
+    if(_drag.type==='move'||_drag.type==='resize-top'){
+      snap.style.top = hY(newStartH)+'px';snap.classList.add('show');
+    } else {
+      snap.style.top = hY(newEndH)+'px';snap.classList.add('show');
+    }
+  }
+}
+
+function endBlockDrag(){
+  if(!_drag) return;
+  const snap = document.getElementById('snap-indicator');
+  if(snap) snap.classList.remove('show');
+  const div = document.querySelector('.sblock[data-block-id="'+_drag.blockId+'"]');
+  if(div) div.classList.remove('dragging-block');
+  document.body.style.userSelect = '';
+  const k = dk(curDate);
+  saveDataLS();sbSaveEntry(k);
+  _drag = null;
+  // Rebuild to sync pill state etc
+  buildTL();
+}
+
 function buildTL(){
   const inner=document.getElementById('blocks-inner');
   inner.style.height=TP+'px';inner.innerHTML='';
@@ -868,7 +1041,12 @@ function buildTL(){
     // Subtasks
     const stContainer=document.createElement('div');stContainer.className='subtasks';body.appendChild(stContainer);
     renderSubtasks(stContainer,b.id);
-    div.appendChild(body);inner.appendChild(div);
+    // Bottom resize handle
+    const bottomHandle=document.createElement('div');bottomHandle.className='resize-handle resize-handle-bottom';
+    div.appendChild(bottomHandle);
+    div.appendChild(body);
+    initBlockDrag(div,b);
+    inner.appendChild(div);
   });
   // Cal events
   const todayEvts=evts[k]||[];
@@ -916,6 +1094,13 @@ function drawNow(c){
   l.innerHTML='<div class="nowdot"></div>';c.appendChild(l);
   setTimeout(()=>{const i=document.getElementById('blocks-inner');if(i)drawNow(i);},60000);
 }
+
+
+// Global drag listeners
+document.addEventListener('mousemove', applyBlockDrag);
+document.addEventListener('touchmove', applyBlockDrag, {passive:false});
+document.addEventListener('mouseup', endBlockDrag);
+document.addEventListener('touchend', endBlockDrag);
 
 function syncScroll(){
   // scroll-wrap contains gutter + blocks and handles all scrolling
@@ -1181,7 +1366,56 @@ async function loadGcalEvents(){
 
 document.addEventListener('DOMContentLoaded',function(){
   try{
-  loadLS();loadDataLS();initPin();
+  // Check if already logged in this session
+  if(!isLoggedIn()){
+    // Show login screen, don't init the app yet
+    document.getElementById('login-screen').style.display='flex';
+  } else {
+    document.getElementById('login-screen').style.display='none';
+  }
+
+  // Login form logic
+  let loginIsSignup = false;
+  document.getElementById('login-toggle-link').onclick=function(){
+    loginIsSignup=!loginIsSignup;
+    document.getElementById('login-btn').textContent=loginIsSignup?'Create account':'Sign in';
+    document.getElementById('login-toggle').innerHTML=loginIsSignup?'Already have an account? <span id="login-toggle-link">Sign in</span>':'No account? <span id="login-toggle-link">Create one</span>';
+    document.getElementById('login-toggle-link').onclick=arguments.callee.caller; // re-bind
+    document.getElementById('login-error').textContent='';
+    // Re-bind after innerHTML change
+    document.getElementById('login-toggle-link').onclick=function(){
+      loginIsSignup=!loginIsSignup;
+      document.getElementById('login-btn').textContent=loginIsSignup?'Create account':'Sign in';
+      document.getElementById('login-toggle').innerHTML=loginIsSignup?'Already have an account? <span id="login-toggle-link">Sign in</span>':'No account? <span id="login-toggle-link">Create one</span>';
+      bindToggle();
+    };
+  };
+  function bindToggle(){
+    const tl=document.getElementById('login-toggle-link');
+    if(tl)tl.onclick=function(){
+      loginIsSignup=!loginIsSignup;
+      document.getElementById('login-btn').textContent=loginIsSignup?'Create account':'Sign in';
+      document.getElementById('login-toggle').innerHTML=loginIsSignup?'Already have an account? <span id="login-toggle-link">Sign in</span>':'No account? <span id="login-toggle-link">Create one</span>';
+      bindToggle();
+    };
+  }
+  bindToggle();
+
+  document.getElementById('login-btn').onclick=()=>{
+    const email=document.getElementById('login-email').value.trim();
+    const password=document.getElementById('login-password').value;
+    doLogin(email,password,loginIsSignup);
+  };
+  document.getElementById('login-password').addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      const email=document.getElementById('login-email').value.trim();
+      const password=document.getElementById('login-password').value;
+      doLogin(email,password,loginIsSignup);
+    }
+  });
+  document.getElementById('logout-btn').onclick=()=>{if(confirm('Sign out?'))doLogout();};
+
+  loadLS();loadDataLS();
   promoteFutureTasks();
 
   // Date nav
@@ -1349,15 +1583,17 @@ document.addEventListener('DOMContentLoaded',function(){
   document.getElementById('save-profile').onclick=()=>{S.profile.projects=document.getElementById('p-projects').value;S.profile.pressures=document.getElementById('p-pressures').value;S.profile.other=document.getElementById('p-other').value;saveLS();sbSaveS();document.getElementById('save-profile').textContent='Saved';setTimeout(()=>document.getElementById('save-profile').textContent='Save profile',1500);};
   document.getElementById('sb-save').onclick=async()=>{S.supabase.url=document.getElementById('sb-url').value.trim();S.supabase.key=document.getElementById('sb-key').value.trim();saveLS();await initSB();document.getElementById('sb-stat').innerHTML=sb?'<span class="sbstat ok">Connected</span>':'<span class="sbstat err">Connection failed</span>';document.getElementById('sb-save').textContent='Saved';setTimeout(()=>document.getElementById('sb-save').textContent='Save connection',1500);};
   document.getElementById('sb-test').onclick=async()=>{const url=document.getElementById('sb-url').value.trim(),key=document.getElementById('sb-key').value.trim();if(!url||!key){document.getElementById('sb-stat').innerHTML='<span class="sbstat err">Enter URL and key first</span>';return;}try{const{createClient}=await import('https://esm.sh/@supabase/supabase-js@2');const t=createClient(url,key);const{error}=await t.from('user_settings').select('id').limit(1);document.getElementById('sb-stat').innerHTML=error?'<span class="sbstat err">Error: '+error.message+'</span>':'<span class="sbstat ok">Connection successful</span>';}catch(e){document.getElementById('sb-stat').innerHTML='<span class="sbstat err">Failed: '+e.message+'</span>';}};
-  document.getElementById('pin-save').onclick=()=>{const np=document.getElementById('new-pin').value,cp=document.getElementById('conf-pin').value;const msg=document.getElementById('pin-msg');if(np.length!==4||!/^\d{4}$/.test(np)){msg.textContent='PIN must be 4 digits.';return;}if(np!==cp){msg.textContent='PINs do not match.';return;}S.pin=np;saveLS();sbSaveS();msg.textContent='PIN set.';};
-  document.getElementById('pin-remove').onclick=()=>{S.pin='';saveLS();sbSaveS();document.getElementById('pin-msg').textContent='PIN removed.';};
+  // PIN removed - using login instead
+
 
   syncScroll();
-  setInterval(updateStrip,60000);
-  updateDate();
-  renderTasks();
-  initSB();
-  setTimeout(loadGcalEvents,500);
+  if(isLoggedIn()){
+    setInterval(updateStrip,60000);
+    updateDate();
+    renderTasks();
+    initSB();
+    setTimeout(loadGcalEvents,500);
+  }
   }catch(err){console.error('INIT ERROR:',err);document.body.innerHTML='<div style="padding:40px;font-family:sans-serif"><h2>Init error</h2><pre>'+err.stack+'</pre></div>';}
 });
 </script>
