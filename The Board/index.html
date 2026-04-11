@@ -959,9 +959,9 @@ async function sendChat(msg){
   const k=dk(curDate),d=dayData[k]||{};
   const ctx='Date: '+fd(curDate)+(isMonday?' (Monday)':'')+(d.action?'. First action: '+d.action:'');
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
+    const r=await fetch('/.netlify/functions/chat',{
       method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:bSP()+'\n\nCONTEXT: '+ctx,messages:chatHist})
     });
     const j=await r.json();
