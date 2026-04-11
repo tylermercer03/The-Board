@@ -1,6 +1,3 @@
-// netlify/functions/chat.js
-// Proxies chat requests to the Anthropic API securely server-side.
-
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -12,13 +9,21 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: '{}' };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  console.log('API key present:', !!apiKey, 'length:', apiKey ? apiKey.length : 0);
+
   if (!apiKey) {
+    console.log('ERROR: ANTHROPIC_API_KEY not set');
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured' }) };
   }
 
   let body;
   try { body = JSON.parse(event.body); }
-  catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
+  catch (e) {
+    console.log('JSON parse error:', e.message);
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON' }) };
+  }
+
+  console.log('Calling Anthropic, messages count:', body.messages ? body.messages.length : 0);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -36,9 +41,12 @@ exports.handler = async (event) => {
       }),
     });
 
+    console.log('Anthropic response status:', response.status);
     const data = await response.json();
+    console.log('Response type:', data.type, 'error:', data.error ? JSON.stringify(data.error) : 'none');
     return { statusCode: response.status, headers, body: JSON.stringify(data) };
   } catch (e) {
+    console.log('Fetch error:', e.message);
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
   }
 };
