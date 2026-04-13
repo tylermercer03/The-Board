@@ -265,12 +265,18 @@ function isLoggedIn(){return !!getAuthToken();}
 <div id="login-screen">
   <div id="login-box">
     <h1>The Board</h1>
-    <p class="login-sub">Your personal operating system.</p>
+    <p class="login-sub" id="login-sub-text">Your personal operating system.</p>
     <div class="login-field"><label>Email</label><input id="login-email" type="email" placeholder="you@email.com" autocomplete="email"/></div>
     <div class="login-field"><label>Password</label><input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
     <button id="login-btn" type="button">Sign in</button>
     <div id="login-error"></div>
     <div id="login-toggle">No account? <span id="login-toggle-link">Create one</span></div>
+    <div id="sb-setup" style="display:none;margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Supabase Connection</div>
+      <div class="login-field"><label>Supabase URL</label><input id="ls-url" type="text" placeholder="https://xxx.supabase.co"/></div>
+      <div class="login-field"><label>Supabase Anon Key</label><input id="ls-key" type="text" placeholder="eyJ..."/></div>
+      <button id="ls-save-btn" type="button" style="font-size:13px;padding:8px 16px;border-radius:var(--r);background:var(--bg2);border:0.5px solid var(--border2);color:var(--text2);cursor:pointer;width:100%">Save & continue</button>
+    </div>
   </div>
 </div>
 
@@ -695,9 +701,13 @@ async function initSB(){
   if(!S.supabase.url||!S.supabase.key)return;
   try{
     const{createClient}=await import('https://esm.sh/@supabase/supabase-js@2');
-    sb=createClient(S.supabase.url,S.supabase.key,{
-      global:{headers:{Authorization:'Bearer '+getAuthToken()}}
-    });
+    sb=createClient(S.supabase.url,S.supabase.key);
+    // Restore session so the client knows who the user is
+    const token=getAuthToken();
+    const refreshToken=sessionStorage.getItem('tb_refresh');
+    if(token&&refreshToken){
+      await sb.auth.setSession({access_token:token,refresh_token:refreshToken});
+    }
     const uid=getUserId();
     const{data:e}=await sb.from('daily_entries').select('*').eq('user_id',uid).gte('entry_date',new Date(Date.now()-7*86400000).toISOString().split('T')[0]);
     if(e)e.forEach(r=>{
@@ -845,41 +855,50 @@ async function doLogin(email, password, isSignup){
   btn.textContent = isSignup ? 'Creating account...' : 'Signing in...';
   btn.disabled = true;
   try {
-    const endpoint = isSignup ? '/.netlify/functions/auth-signup' : '/.netlify/functions/auth-login';
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email, password}),
-    });
-    const data = await res.json();
-    if(data.error) throw new Error(data.error);
+    // Use Supabase client directly for auth
+    const{createClient}=await import('https://esm.sh/@supabase/supabase-js@2');
+    const authClient=createClient(S.supabase.url,S.supabase.key);
+    let session, user;
     if(isSignup){
-      errEl.style.color = 'var(--ok-text)';
-      errEl.textContent = 'Account created! Signing you in...';
-      await doLogin(email, password, false);
-      return;
+      const{data,error}=await authClient.auth.signUp({email,password});
+      if(error)throw new Error(error.message);
+      if(!data.session){
+        // Email confirmation required - but we disabled it for admin-created users
+        errEl.style.color='var(--ok-text)';
+        errEl.textContent='Account created! Check email to confirm, then sign in.';
+        btn.disabled=false;btn.textContent='Create account';return;
+      }
+      session=data.session;user=data.user;
+    } else {
+      const{data,error}=await authClient.auth.signInWithPassword({email,password});
+      if(error)throw new Error(error.message);
+      session=data.session;user=data.user;
     }
-    setAuthToken(data.session.access_token);
-    setUserId(data.user.id);
-    document.getElementById('login-screen').style.display = 'none';
+    setAuthToken(session.access_token);
+    setUserId(user.id);
+    sessionStorage.setItem('tb_refresh',session.refresh_token);
+    document.getElementById('login-screen').style.display='none';
     await initSB();
     updateDate();renderTasks();
+    setTimeout(loadGcalEvents,500);
   } catch(e) {
-    errEl.style.color = 'var(--bad-text)';
-    errEl.textContent = e.message;
+    errEl.style.color='var(--bad-text)';
+    errEl.textContent=e.message;
   } finally {
-    btn.disabled = false;
-    btn.textContent = isSignup ? 'Create account' : 'Sign in';
+    btn.disabled=false;
+    btn.textContent=isSignup?'Create account':'Sign in';
   }
 }
 
-function doLogout(){
+async function doLogout(){
+  if(sb)try{await sb.auth.signOut();}catch(e){}
   setAuthToken(null);setUserId(null);
-  sb = null;
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('login-email').value = '';
-  document.getElementById('login-password').value = '';
-  document.getElementById('login-error').textContent = '';
+  sessionStorage.removeItem('tb_refresh');
+  sb=null;
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-email').value='';
+  document.getElementById('login-password').value='';
+  document.getElementById('login-error').textContent='';
 }
 
 // ── DRAG & RESIZE BLOCKS ──────────────────────────────────────────────────
@@ -1401,6 +1420,29 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   bindToggle();
 
+  // Show supabase setup if no creds stored
+  if(!S.supabase.url||!S.supabase.key){
+    document.getElementById('sb-setup').style.display='block';
+    document.getElementById('login-sub-text').textContent='First, enter your Supabase connection details.';
+    document.getElementById('login-email').closest('.login-field').style.display='none';
+    document.getElementById('login-password').closest('.login-field').style.display='none';
+    document.getElementById('login-btn').style.display='none';
+    document.getElementById('login-toggle').style.display='none';
+    document.getElementById('ls-url').value=S.supabase.url||'';
+    document.getElementById('ls-key').value=S.supabase.key||'';
+    document.getElementById('ls-save-btn').onclick=()=>{
+      const url=document.getElementById('ls-url').value.trim();
+      const key=document.getElementById('ls-key').value.trim();
+      if(!url||!key){alert('Both fields required');return;}
+      S.supabase.url=url;S.supabase.key=key;saveLS();
+      document.getElementById('sb-setup').style.display='none';
+      document.getElementById('login-sub-text').textContent='Your personal operating system.';
+      document.getElementById('login-email').closest('.login-field').style.display='block';
+      document.getElementById('login-password').closest('.login-field').style.display='block';
+      document.getElementById('login-btn').style.display='block';
+      document.getElementById('login-toggle').style.display='block';
+    };
+  }
   document.getElementById('login-btn').onclick=()=>{
     const email=document.getElementById('login-email').value.trim();
     const password=document.getElementById('login-password').value;
