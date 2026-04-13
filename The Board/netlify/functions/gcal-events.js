@@ -1,5 +1,51 @@
 const { createClient } = require('@supabase/supabase-js');
 
+// Convert a Google Calendar datetime string to Pacific Time HH:MM
+function toPacificTime(dtString, isAllDay) {
+  if (!dtString || isAllDay) return null;
+  
+  // Parse the datetime - Google returns ISO format with timezone offset
+  // e.g. "2026-04-12T14:00:00-07:00" or "2026-04-12T21:00:00Z"
+  const date = new Date(dtString);
+  
+  // Format in Pacific Time
+  const pst = date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  
+  // toLocaleString returns "HH:MM" but sometimes "24:MM" for midnight
+  const [h, m] = pst.split(':').map(Number);
+  const hour = h === 24 ? 0 : h;
+  return String(hour).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+
+// Get the date in Pacific Time for a given datetime string
+function toPacificDate(dtString, isAllDay) {
+  if (!dtString) return '';
+  
+  if (isAllDay) {
+    // All-day events use date-only strings like "2026-04-12"
+    // Return as-is - these are calendar dates without timezone
+    return dtString.split('T')[0];
+  }
+  
+  const date = new Date(dtString);
+  
+  // Get the date in Pacific Time
+  const parts = date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).split('/');
+  
+  // Returns MM/DD/YYYY, convert to YYYY-MM-DD
+  return `${parts[2]}-${parts[0]}-${parts[1]}`;
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -17,8 +63,6 @@ exports.handler = async (event) => {
   }
 
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-  console.log('Supabase URL:', process.env.SUPABASE_URL ? 'set' : 'MISSING');
-  console.log('Service key:', process.env.SUPABASE_SERVICE_KEY ? 'set' : 'MISSING');
 
   const { data: row, error: sbError } = await sb
     .from('user_settings')
@@ -26,21 +70,15 @@ exports.handler = async (event) => {
     .eq('key', 'gcal_tokens')
     .single();
 
-  if (sbError) {
-    console.log('Supabase error:', sbError.message);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'supabase_error: ' + sbError.message }) };
-  }
-
-  if (!row?.value?.access_token) {
-    console.log('No tokens found in user_settings');
+  if (sbError || !row?.value?.access_token) {
+    console.log('No tokens found:', sbError?.message);
     return { statusCode: 401, headers, body: JSON.stringify({ error: 'not_connected' }) };
   }
 
-  console.log('Tokens found, expires_at:', row.value.expires_at, 'now:', Date.now());
   let { access_token, refresh_token, expires_at } = row.value;
 
+  // Refresh token if expired
   if (Date.now() > expires_at - 60000) {
-    console.log('Token expired, refreshing...');
     try {
       const res = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -75,10 +113,7 @@ exports.handler = async (event) => {
       { headers: { Authorization: 'Bearer ' + access_token } }
     );
     const calList = await calListRes.json();
-    if (calList.error) {
-      console.log('Calendar list error:', calList.error.message);
-      throw new Error(calList.error.message);
-    }
+    if (calList.error) throw new Error(calList.error.message);
 
     const calendars = (calList.items || []).filter(cal =>
       cal.selected !== false && cal.accessRole !== 'freeBusyReader'
@@ -86,7 +121,8 @@ exports.handler = async (event) => {
     console.log('Calendars found:', calendars.map(c => c.summary).join(', '));
 
     const params = new URLSearchParams({
-      timeMin, timeMax,
+      timeMin,
+      timeMax,
       singleEvents: 'true',
       orderBy: 'startTime',
       maxResults: '50',
@@ -115,17 +151,25 @@ exports.handler = async (event) => {
     const events = [];
     results.forEach(({ calName, color, items }) => {
       items.forEach(ev => {
-        const startDT = ev.start?.dateTime || ev.start?.date;
-        const endDT = ev.end?.dateTime || ev.end?.date;
         const isAllDay = !ev.start?.dateTime;
+        const startDT = ev.start?.dateTime || ev.start?.date;
+        const endDT   = ev.end?.dateTime   || ev.end?.date;
+
+        // Convert to Pacific Time
+        const startTime = toPacificTime(startDT, isAllDay);
+        const endTime   = toPacificTime(endDT,   isAllDay);
+        const eventDate = toPacificDate(startDT,  isAllDay);
+
+        console.log(`Event: ${ev.summary} | raw: ${startDT} | pacific date: ${eventDate} | pacific time: ${startTime}-${endTime} | allDay: ${isAllDay}`);
+
         events.push({
           id: ev.id,
           title: ev.summary || '(No title)',
           calendar: calName,
           color,
-          start_time: isAllDay ? '00:00' : timeOnly(startDT),
-          end_time: isAllDay ? '23:59' : timeOnly(endDT),
-          event_date: dateOnly(startDT),
+          start_time: startTime || '00:00',
+          end_time:   endTime   || '23:59',
+          event_date: eventDate,
           gcal_id: ev.id,
           all_day: isAllDay,
           notes: ev.description || '',
@@ -142,14 +186,3 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
   }
 };
-
-function timeOnly(dt) {
-  if (!dt) return '00:00';
-  if (dt.includes('T')) return dt.split('T')[1].slice(0, 5);
-  return '00:00';
-}
-
-function dateOnly(dt) {
-  if (!dt) return '';
-  return dt.split('T')[0];
-}
